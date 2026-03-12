@@ -622,7 +622,31 @@
             background: rgba(239, 68, 68, 0.2);
         }
 
+        /* ESTILOS EXTRA RESPONSIVOS E INTERACTIVOS */
         @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 15px;
+                padding: 1rem;
+            }
+            
+            nav {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                padding: 1rem;
+            }
+            
+            .nav-btn {
+                flex: 1 1 calc(50% - 1rem);
+                font-size: 0.75rem;
+                padding: 0.5rem;
+                text-align: center;
+            }
+
+            main {
+                padding: 0 1rem 1rem;
+            }
+
             .dnd-container {
                 grid-template-columns: 1fr;
             }
@@ -630,10 +654,55 @@
             .match-container {
                 grid-template-columns: 1fr;
             }
-
-            nav {
-                flex-wrap: wrap;
+            
+            .quiz-container {
+                padding: 1.5rem;
+                margin: 0 -0.5rem;
+                border-radius: 8px;
             }
+            
+            .logo-area h1 {
+                font-size: 1.8rem;
+            }
+            
+            .card-container {
+                height: 220px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .nav-btn {
+                flex: 1 1 100%;
+            }
+        }
+
+        /* MEJORAS DE INTERACTIVIDAD */
+        .btn-pomo, .nav-btn, .quiz-btn, .eval-btn, .btn-next, .match-item, .draggable-word {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        
+        .quiz-btn:active, .nav-btn:active, .btn-next:active {
+            transform: scale(0.95);
+        }
+
+        .logo-area h1 {
+            animation: pulseGlow 3s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { text-shadow: 0 0 10px var(--cyan-neon), 0 0 20px rgba(6, 182, 212, 0.5); }
+            100% { text-shadow: 0 0 15px var(--cyan-neon), 0 0 30px rgba(6, 182, 212, 0.8); }
+        }
+
+        .card-container, .quiz-btn, .draggable-word, .match-item {
+            opacity: 0;
+            animation: fadeInItems 0.5s forwards;
+            animation-delay: calc(var(--item-index, 0) * 0.05s);
+        }
+
+        @keyframes fadeInItems {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -846,6 +915,7 @@
         DATA.flashcards.forEach((card, index) => {
             const cardEl = document.createElement('div');
             cardEl.className = 'card-container';
+            cardEl.style.setProperty('--item-index', index);
             cardEl.innerHTML = `
                 <div class="flashcard">
                     <div class="card-face card-front">
@@ -867,6 +937,28 @@
             cardEl.addEventListener('click', () => {
                 const fc = cardEl.querySelector('.flashcard');
                 fc.classList.toggle('flipped');
+            });
+            
+            // 3D Tilt effect on mousemove
+            cardEl.addEventListener('mousemove', (e) => {
+                const fc = cardEl.querySelector('.flashcard:not(.flipped)');
+                if(!fc) return;
+                const rect = cardEl.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = ((y - centerY) / centerY) * -15;
+                const rotateY = ((x - centerX) / centerX) * 15;
+                
+                fc.style.transform = `scale(1.05) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+            
+            cardEl.addEventListener('mouseleave', () => {
+                const fc = cardEl.querySelector('.flashcard:not(.flipped)');
+                if(fc) {
+                    fc.style.transform = '';
+                }
             });
 
             fcContainer.appendChild(cardEl);
@@ -904,6 +996,7 @@
             qData.options.forEach((opt, index) => {
                 const btn = document.createElement('button');
                 btn.className = 'quiz-btn';
+                btn.style.setProperty('--item-index', index);
                 btn.textContent = opt;
                 btn.onclick = () => checkAnswer(index, btn);
                 qOptions.appendChild(btn);
@@ -994,9 +1087,10 @@
         const dropzones = document.querySelectorAll('.dropzone');
         totalDrops = dropzones.length;
 
-        shuffle([...DATA.dnd.words]).forEach(word => {
+        shuffle([...DATA.dnd.words]).forEach((word, index) => {
             const wEl = document.createElement('div');
             wEl.className = 'draggable-word';
+            wEl.style.setProperty('--item-index', index);
             wEl.textContent = word;
             wEl.draggable = true;
             wEl.dataset.word = word;
@@ -1044,19 +1138,30 @@
                     const nodeWord = document.querySelector(`.draggable-word[data-word="${draggedWord}"]`);
                     if (nodeWord) nodeWord.style.display = 'none';
 
-                    // Efecto destello en el dropzone
+                    // Efecto destello en el dropzone + Feedback Textual
                     dz.animate([
-                        { boxShadow: '0 0 0px var(--cyan-neon)' },
-                        { boxShadow: '0 0 20px var(--cyan-neon)' },
-                        { boxShadow: '0 0 0px var(--cyan-neon)' }
-                    ], { duration: 500 });
+                        { boxShadow: '0 0 0px var(--cyan-neon)', backgroundColor: 'rgba(6, 182, 212, 0.1)' },
+                        { boxShadow: '0 0 20px var(--cyan-neon)', backgroundColor: 'rgba(6, 182, 212, 0.5)' },
+                        { boxShadow: '0 0 0px var(--cyan-neon)', backgroundColor: 'rgba(6, 182, 212, 0.1)' }
+                    ], { duration: 600 });
+                    
+                    const originalText = dz.textContent;
+                    dz.textContent = "✓ " + originalText;
+                    setTimeout(() => dz.textContent = originalText, 1000);
 
                     correctDrops++;
                     if (correctDrops === totalDrops) {
                         dndSuccess.style.display = 'block';
+                        fireConfetti();
                     }
                 } else {
-                    // Fallo: Shake screen effect sutil
+                    // Fallo: Shake screen effect sutil + Feedback visual en el dropzone
+                    dz.animate([
+                        { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'var(--red-neon)' },
+                        { backgroundColor: 'rgba(239, 68, 68, 0.4)', borderColor: 'var(--red-neon)' },
+                        { backgroundColor: 'rgba(217, 70, 239, 0.05)', borderColor: 'transparent' }
+                    ], { duration: 500 });
+
                     document.body.animate([
                         { transform: 'translateX(-5px)' },
                         { transform: 'translateX(5px)' },
@@ -1074,15 +1179,17 @@
         let selectedTerm = null;
         let selectedDef = null;
         let matchCount = 0;
+        let isMatchAnimating = false; // Flag para prevenir spam de clicks
 
         function initMatchModule() {
             // Arrays separados y mezclados
             const terms = DATA.match.map((item, index) => ({ text: item.term, id: index }));
             const defs = DATA.match.map((item, index) => ({ text: item.def, id: index }));
 
-            shuffle(terms).forEach(t => {
+            shuffle(terms).forEach((t, index) => {
                 const div = document.createElement('div');
                 div.className = 'match-item';
+                div.style.setProperty('--item-index', index);
                 div.textContent = t.text;
                 div.dataset.id = t.id;
                 div.dataset.type = 'term';
@@ -1090,9 +1197,10 @@
                 matchTermsContainer.appendChild(div);
             });
 
-            shuffle(defs).forEach(d => {
+            shuffle(defs).forEach((d, index) => {
                 const div = document.createElement('div');
                 div.className = 'match-item';
+                div.style.setProperty('--item-index', index);
                 div.textContent = d.text;
                 div.dataset.id = d.id;
                 div.dataset.type = 'def';
@@ -1102,7 +1210,8 @@
         }
 
         function handleMatchClick(element) {
-            if (element.classList.contains('matched')) return;
+            // Early exit si está animando o ya resuelto
+            if (isMatchAnimating || element.classList.contains('matched')) return;
 
             // Deseleccionar si se hace click en el mismo
             if (element.classList.contains('selected')) {
@@ -1124,15 +1233,33 @@
 
             // Comprobar coincidencia
             if (selectedTerm && selectedDef) {
+                isMatchAnimating = true; // Bloquea clicks durante la animación
+
                 if (selectedTerm.dataset.id === selectedDef.dataset.id) {
                     // Éxito: Sincronización
                     selectedTerm.classList.remove('selected');
                     selectedDef.classList.remove('selected');
                     selectedTerm.classList.add('matched');
                     selectedDef.classList.add('matched');
+                    
+                    // Asegurar que no sean clickeables
+                    selectedTerm.style.pointerEvents = 'none';
+                    selectedDef.style.pointerEvents = 'none';
+                    
+                    // Feedback temporal
+                    const tempTextT = selectedTerm.textContent;
+                    const tempTextD = selectedDef.textContent;
+                    selectedTerm.textContent = "✓ ¡Correcto!";
+                    selectedDef.textContent = "✓ ¡Correcto!";
+                    
+                    setTimeout(() => {
+                        selectedTerm.textContent = tempTextT;
+                        selectedDef.textContent = tempTextD;
+                        selectedTerm = null;
+                        selectedDef = null;
+                        isMatchAnimating = false; // Desbloquear
+                    }, 1000);
 
-                    selectedTerm = null;
-                    selectedDef = null;
                     matchCount++;
 
                     if (matchCount === DATA.match.length) {
@@ -1146,13 +1273,22 @@
                     // Fallo: Glitch
                     selectedTerm.classList.add('error');
                     selectedDef.classList.add('error');
+                    
+                    // Feedback temporal
+                    const tempTextT = selectedTerm.textContent;
+                    const tempTextD = selectedDef.textContent;
+                    selectedTerm.textContent = "✗ Incorrecto";
+                    selectedDef.textContent = "✗ Incorrecto";
 
                     setTimeout(() => {
+                        selectedTerm.textContent = tempTextT;
+                        selectedDef.textContent = tempTextD;
                         selectedTerm.classList.remove('error', 'selected');
                         selectedDef.classList.remove('error', 'selected');
                         selectedTerm = null;
                         selectedDef = null;
-                    }, 400);
+                        isMatchAnimating = false; // Desbloquear
+                    }, 800);
                 }
             }
         }
@@ -1165,36 +1301,70 @@
         const canvas = document.getElementById('neuralCanvas');
         const ctx = canvas.getContext('2d');
         let width, height, particles;
+        
+        let mouse = { x: null, y: null, radius: 150 };
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.x;
+            mouse.y = e.y;
+        });
+        window.addEventListener('mouseout', () => {
+            mouse.x = null;
+            mouse.y = null;
+        });
 
         function initCanvas() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
             particles = [];
-            const pCount = Math.floor(width / 20); // Densidad adaptable
+            let pCount = Math.floor(width / 15); // Densidad adaptable (aumentada)
+            if (width < 768) pCount = Math.floor(width / 10);
 
             for (let i = 0; i < pCount; i++) {
                 particles.push({
                     x: Math.random() * width,
                     y: Math.random() * height,
-                    vx: (Math.random() - 0.5) * 0.5,
-                    vy: (Math.random() - 0.5) * 0.5
+                    vx: (Math.random() - 0.5) * 0.8,
+                    vy: (Math.random() - 0.5) * 0.8,
+                    baseVx: (Math.random() - 0.5) * 0.8,
+                    baseVy: (Math.random() - 0.5) * 0.8
                 });
             }
         }
 
         function drawParticles() {
             ctx.clearRect(0, 0, width, height);
-            ctx.fillStyle = 'rgba(6, 182, 212, 0.5)';
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.8)';
             ctx.lineWidth = 0.5;
 
             for (let i = 0; i < particles.length; i++) {
                 let p = particles[i];
+                
+                // Efecto de repulsión con el mouse magnético
+                if (mouse.x != null) {
+                    let dx = mouse.x - p.x;
+                    let dy = mouse.y - p.y;
+                    let distance = Math.hypot(dx, dy);
+                    if (distance < mouse.radius) {
+                        const force = (mouse.radius - distance) / mouse.radius;
+                        const fx = (dx / distance) * force * 2;
+                        const fy = (dy / distance) * force * 2;
+                        p.vx -= fx;
+                        p.vy -= fy;
+                    }
+                }
+
+                // Fricción constante para recuperar velocidad inicial
+                p.vx = p.vx * 0.95 + p.baseVx * 0.05;
+                p.vy = p.vy * 0.95 + p.baseVy * 0.05;
+
                 p.x += p.vx;
                 p.y += p.vy;
 
                 // Rebote bordes
-                if (p.x < 0 || p.x > width) p.vx *= -1;
-                if (p.y < 0 || p.y > height) p.vy *= -1;
+                if (p.x < 0) { p.x = 0; p.vx *= -1; p.baseVx *= -1; }
+                if (p.x > width) { p.x = width; p.vx *= -1; p.baseVx *= -1; }
+                if (p.y < 0) { p.y = 0; p.vy *= -1; p.baseVy *= -1; }
+                if (p.y > height) { p.y = height; p.vy *= -1; p.baseVy *= -1; }
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
@@ -1205,12 +1375,26 @@
                     let p2 = particles[j];
                     let dist = Math.hypot(p.x - p2.x, p.y - p2.y);
 
-                    if (dist < 100) {
-                        ctx.strokeStyle = `rgba(6, 182, 212, ${1 - dist / 100})`;
+                    if (dist < 120) {
+                        ctx.strokeStyle = `rgba(6, 182, 212, ${1 - dist / 120})`;
                         ctx.beginPath();
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(p2.x, p2.y);
                         ctx.stroke();
+                    }
+                }
+                
+                // Conectar al mouse (red neural)
+                if (mouse.x != null) {
+                    let mouseDist = Math.hypot(mouse.x - p.x, mouse.y - p.y);
+                    if (mouseDist < 150) {
+                        ctx.strokeStyle = `rgba(217, 70, 239, ${1 - mouseDist / 150})`; // Magenta
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(mouse.x, mouse.y);
+                        ctx.stroke();
+                        ctx.lineWidth = 0.5; // Reset
                     }
                 }
             }
