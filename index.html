@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modelado y Simulación | Neural Study Deck</title>
+    <!-- Fuentes: Inter para legibilidad, Fira Code para datos técnicos -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Inter:wght@300;400;600;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* =========================================
+           VARIABLES CYBERPUNK Y RESET
+        ========================================= */
+        :root {
+            --bg-dark: #070B14;
+            --panel-glass: rgba(15, 23, 42, 0.6);
+            --cyan-neon: #06b6d4;
+            --magenta-neon: #d946ef;
+            --green-neon: #10b981;
+            --red-neon: #ef4444;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border-glow: rgba(6, 182, 212, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Canvas Background */
+        #neuralCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* =========================================
+           HEADER Y POMODORO (DASHBOARD)
+        ========================================= */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: var(--panel-glass);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-glow);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .logo-area h1 {
+            font-family: 'Fira Code', monospace;
+            font-size: 1.5rem;
+            color: #fff;
+            text-shadow: 0 0 10px var(--cyan-neon);
+            letter-spacing: -1px;
+        }
+
+        .logo-area span {
+            color: var(--magenta-neon);
+        }
+
+        .pomodoro-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 5px 15px;
+            border-radius: 50px;
+            border: 1px solid var(--border-glow);
+        }
+
+        .ring-container {
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+
+        .progress-ring__circle {
+            transition: stroke-dashoffset 1s linear;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        .time-display {
+            font-family: 'Fira Code', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--cyan-neon);
+        }
+
+        .btn-pomo {
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: transform 0.2s, color 0.2s;
+        }
+
+        .btn-pomo:hover {
+            color: var(--cyan-neon);
+            transform: scale(1.1);
+        }
+
+        /* =========================================
+           NAVEGACIÓN DE MÓDULOS
+        ========================================= */
+        nav {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            padding: 2rem 0;
+            z-index: 10;
+        }
+
+        .nav-btn {
+            background: var(--panel-glass);
+            border: 1px solid var(--border-glow);
+            color: var(--text-muted);
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-btn.active {
+            color: #fff;
+            border-color: var(--cyan-neon);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        }
+
+        .nav-btn.active::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--cyan-neon);
+            box-shadow: 0 0 10px var(--cyan-neon);
+        }
+
+        .nav-btn:hover:not(.active) {
+            background: rgba(6, 182, 212, 0.1);
+            color: #fff;
+        }
+
+        /* =========================================
+           CONTENEDOR PRINCIPAL Y ANIMACIONES
+        ========================================= */
+        main {
+            flex-grow: 1;
+            padding: 0 2rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            position: relative;
+            perspective: 1000px;
+        }
+
+        .module {
+            display: none;
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        .module.active {
+            display: block;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* =========================================
+           MÓDULO 1: FLASHCARDS 3D
+        ========================================= */
+        .flashcard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 1rem 0;
+        }
+
+        .card-container {
+            perspective: 1000px;
+            height: 250px;
+            cursor: pointer;
+        }
+
+        .flashcard {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .card-container:hover .flashcard:not(.flipped) {
+            transform: scale(1.02) rotateX(2deg) rotateY(-2deg);
+        }
+
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: var(--panel-glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-glow);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-front h3 {
+            font-size: 1.2rem;
+            color: var(--cyan-neon);
+            margin-bottom: 10px;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .card-front p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+            background: rgba(20, 30, 50, 0.8);
+            border-color: var(--magenta-neon);
+        }
+
+        .card-back p {
+            font-size: 1rem;
+            line-height: 1.5;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .eval-buttons {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .eval-btn {
+            flex: 1;
+            padding: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .btn-easy {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--green-neon);
+            border: 1px solid var(--green-neon);
+        }
+
+        .btn-med {
+            background: rgba(217, 70, 239, 0.2);
+            color: var(--magenta-neon);
+            border: 1px solid var(--magenta-neon);
+        }
+
+        .btn-hard {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--red-neon);
+            border: 1px solid var(--red-neon);
+        }
+
+        .eval-btn:hover {
+            filter: brightness(1.5);
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        /* =========================================
+           MÓDULO 2: QUIZZES ALTO IMPACTO
+        ========================================= */
+        .quiz-container {
+            background: var(--panel-glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            padding: 3rem;
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quiz-question {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: #fff;
+            font-family: 'Fira Code', monospace;
+        }
+
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .quiz-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-main);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .quiz-btn:hover {
+            background: rgba(6, 182, 212, 0.15);
+            border-color: var(--cyan-neon);
+            transform: scale(1.02);
+        }
+
+        /* Estados de respuesta */
+        .quiz-btn.correct {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: var(--green-neon);
+            color: var(--green-neon);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .quiz-btn.wrong {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--red-neon);
+            color: var(--red-neon);
+            text-decoration: line-through;
+        }
+
+        /* Efecto Glitch / Shake */
+        .shake-error {
+            animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+            box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+
+        @keyframes shake {
+
+            10%,
+            90% {
+                transform: translate3d(-2px, 0, 0);
+            }
+
+            20%,
+            80% {
+                transform: translate3d(4px, 0, 0);
+            }
+
+            30%,
+            50%,
+            70% {
+                transform: translate3d(-8px, 0, 0);
+            }
+
+            40%,
+            60% {
+                transform: translate3d(8px, 0, 0);
+            }
+        }
+
+        /* Efecto Flash Éxito */
+        .flash-success {
+            animation: flashSuccess 0.5s ease-out;
+        }
+
+        @keyframes flashSuccess {
+            0% {
+                box-shadow: inset 0 0 0px rgba(16, 185, 129, 0);
+            }
+
+            50% {
+                box-shadow: inset 0 0 100px rgba(16, 185, 129, 0.8);
+            }
+
+            100% {
+                box-shadow: inset 0 0 0px rgba(16, 185, 129, 0);
+            }
+        }
+
+        .quiz-controls {
+            margin-top: 2rem;
+            display: none;
+            /* Oculto hasta responder */
+        }
+
+        .btn-next {
+            background: var(--cyan-neon);
+            color: var(--bg-dark);
+            border: none;
+            padding: 0.8rem 2rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px var(--cyan-neon);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-next:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px var(--cyan-neon);
+        }
+
+        /* =========================================
+           MÓDULO 3: DRAG & DROP (SNAP MAGNETICO)
+        ========================================= */
+        .dnd-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+
+        .dnd-text-area {
+            background: var(--panel-glass);
+            padding: 2.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-glow);
+            font-size: 1.1rem;
+            line-height: 2;
+        }
+
+        .dropzone {
+            display: inline-block;
+            min-width: 120px;
+            height: 35px;
+            border-bottom: 2px dashed var(--magenta-neon);
+            margin: 0 8px;
+            vertical-align: middle;
+            background: rgba(217, 70, 239, 0.05);
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .dropzone.drag-over {
+            background: rgba(217, 70, 239, 0.3);
+            border-style: solid;
+            box-shadow: 0 0 10px var(--magenta-neon);
+            transform: scale(1.05);
+        }
+
+        .dropzone.filled {
+            border-bottom: 2px solid var(--cyan-neon);
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--cyan-neon);
+            font-weight: bold;
+            font-family: 'Fira Code', monospace;
+            text-shadow: 0 0 5px var(--cyan-neon);
+        }
+
+        .word-bank {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .word-bank h3 {
+            color: var(--magenta-neon);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .draggable-word {
+            background: var(--panel-glass);
+            border: 1px solid var(--cyan-neon);
+            color: #fff;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: grab;
+            text-align: center;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .draggable-word:active {
+            cursor: grabbing;
+        }
+
+        .draggable-word:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(6, 182, 212, 0.3);
+        }
+
+        .dnd-success {
+            margin-top: 1rem;
+            color: var(--green-neon);
+            font-weight: bold;
+            display: none;
+            text-align: center;
+            animation: fadeInUp 0.5s;
+        }
+
+        /* Partículas CSS de Confeti (Generadas dinámicamente) */
+        .confetti {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: var(--cyan-neon);
+            opacity: 0;
+        }
+
+        /* =========================================
+           NUEVO MÓDULO 4: MATCHING NEURAL (CONECTAR CONCEPTOS)
+        ========================================= */
+        .match-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .match-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .match-item {
+            background: var(--panel-glass);
+            border: 1px solid var(--border-glow);
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.95rem;
+        }
+
+        .match-item:hover {
+            border-color: var(--cyan-neon);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+            transform: scale(1.02);
+        }
+
+        .match-item.selected {
+            background: rgba(6, 182, 212, 0.2);
+            border-color: var(--cyan-neon);
+            box-shadow: 0 0 20px var(--cyan-neon);
+            transform: scale(1.05);
+        }
+
+        .match-item.matched {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--green-neon);
+            color: var(--green-neon);
+            pointer-events: none;
+            opacity: 0.6;
+            box-shadow: none;
+            transform: scale(0.98);
+        }
+
+        .match-item.error {
+            animation: shake 0.4s cubic-bezier(.36, .07, .19, .97) both;
+            border-color: var(--red-neon);
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .dnd-container {
+                grid-template-columns: 1fr;
+            }
+
+            .match-container {
+                grid-template-columns: 1fr;
+            }
+
+            nav {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Canvas para Partículas Neuronales (Fondo) -->
+    <canvas id="neuralCanvas"></canvas>
+
+    <!-- Header y Pomodoro -->
+    <header>
+        <div class="logo-area">
+            <h1>SYS<span>.</span>SIM</h1>
+        </div>
+        <div class="pomodoro-container">
+            <button class="btn-pomo" id="pomoBtn" title="Iniciar/Pausar">▶</button>
+            <div class="time-display" id="timeDisplay">25:00</div>
+            <div class="ring-container">
+                <svg width="40" height="40" viewBox="0 0 40 40">
+                    <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"></circle>
+                    <circle id="pomoRing" cx="20" cy="20" r="16" fill="none" stroke="var(--magenta-neon)"
+                        stroke-width="4" stroke-dasharray="100.5" stroke-dashoffset="0"></circle>
+                </svg>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navegación -->
+    <nav>
+        <button class="nav-btn active" data-target="module-flashcards">Core Concepts (3D)</button>
+        <button class="nav-btn" data-target="module-quiz">Micro-Evaluación</button>
+        <button class="nav-btn" data-target="module-dnd">Drag & Drop (Arquitectura)</button>
+        <button class="nav-btn" data-target="module-match">Clasificador Neural</button>
+    </nav>
+
+    <!-- Contenedor de Módulos -->
+    <main id="app-container">
+
+        <!-- Módulo 1: Flashcards -->
+        <section id="module-flashcards" class="module active">
+            <div class="flashcard-grid" id="flashcard-container">
+                <!-- Inyectado por JS -->
+            </div>
+        </section>
+
+        <!-- Módulo 2: Quiz -->
+        <section id="module-quiz" class="module">
+            <div class="quiz-container" id="quiz-ui">
+                <h2 class="quiz-question" id="quiz-question">Cargando...</h2>
+                <div class="quiz-options" id="quiz-options">
+                    <!-- Opciones inyectadas por JS -->
+                </div>
+                <div class="quiz-controls" id="quiz-controls">
+                    <button class="btn-next" id="btn-next-quiz">Siguiente Nodo ➔</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Módulo 3: Drag & Drop -->
+        <section id="module-dnd" class="module">
+            <div class="dnd-container">
+                <div class="dnd-text-area" id="dnd-text">
+                    <!-- Texto inyectado por JS -->
+                </div>
+                <div class="word-bank">
+                    <h3>Banco de Datos</h3>
+                    <div id="word-bank-container" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Palabras inyectadas -->
+                    </div>
+                </div>
+            </div>
+            <div class="dnd-success" id="dnd-success-msg">¡Sincronización Neural Completada!</div>
+        </section>
+
+        <!-- Módulo 4: Clasificador Neural (Matching) -->
+        <section id="module-match" class="module">
+            <h2
+                style="text-align:center; color:var(--cyan-neon); font-family:'Fira Code', monospace; margin-bottom: 2rem;">
+                [ Enlazar Conceptos: Taxonomía de Modelos ]</h2>
+            <p style="text-align:center; color:var(--text-muted); margin-bottom: 2rem; font-size: 0.9rem;">Seleccione un
+                término a la izquierda y su definición correspondiente a la derecha.</p>
+            <div class="match-container" id="match-ui">
+                <div class="match-column" id="match-terms"></div>
+                <div class="match-column" id="match-defs"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        /* =========================================================================
+           BASE DE DATOS NEURONAL (Extraída de "UNIDAD 1.pdf" - Ing. Rodríguez)
+           Clasificación: Conceptos Core, Relaciones, Datos de Memorización
+        ========================================================================= */
+        const DATA = {
+            flashcards: [
+                { q: "¿Qué es la Simulación de Sistemas?", a: "Técnica numérica que evalúa modelos lógico-matemáticos para imitar el comportamiento dinámico de sistemas complejos bajo parámetros estocásticos.", type: "Core" },
+                { q: "¿Paradigma Analítico vs. Simulación?", a: "Analítico: Resuelve matemáticamente para hallar respuesta exacta (baja tolerancia a complejidad). Simulación: Ensaya computacionalmente para inferir comportamiento (alta tolerancia).", type: "Core" },
+                { q: "Nombra 3 de los 5 Anti-patrones de Simulación", a: "1. Burn-in inadecuado. 2. KPIs Desalineados. 3. Holgazanería Estadística. 4. Ceguera de Varianza. 5. Mala Abstracción.", type: "Memorización" },
+                { q: "Diferencia entre variable Endógena y Exógena", a: "Endógena: Ocurre dentro del sistema (ej. nivel de producción). Exógena: Ocurre en el Medio Ambiente, son inputs paramétricos (ej. ciberataque).", type: "Relación" },
+                { q: "¿Qué postula el enfoque numérico (Monte Carlo)?", a: "Abraza la complejidad usando fuerza bruta iterativa y números pseudoaleatorios cuando la resolución analítica colapsa por interacciones no lineales.", type: "Core" },
+                { q: "¿Qué es el Estado del Sistema?", a: "Una 'fotografía' en un instante 't' que captura los atributos actuales y variables acumuladas de las entidades.", type: "Memorización" },
+                { q: "¿Cuáles son las 3 ventajas estratégicas de la simulación?", a: "1. Seguridad (Sandbox). 2. Time-Scaling (acelerar/ralentizar tiempo). 3. Capacity Planning (dimensionar sistemas inexistentes).", type: "Memorización" },
+                { q: "¿Cuáles son las 3 desventajas inherentes de la simulación?", a: "1. Falsa Exactitud (todo es aproximación estadística). 2. Costo Operativo (poder de cómputo/horas ingeniero). 3. Overhead (degradación de rendimiento al extraer métricas en producción).", type: "Relación" },
+                { q: "¿Qué es el 'Burn-in inadecuado'?", a: "Es un anti-patrón donde se miden variables ANTES de que el sistema alcance su estado estable operativo.", type: "Core" },
+                { q: "¿Cuáles son los 4 niveles de modelización según John W. Sutherland?", a: "1. Estado (estructural). 2. Paramétrico (valores numéricos). 3. Relaciones (interacciones). 4. Coeficientes (valores a conjuntos de variables).", type: "Memorización" },
+                { q: "Diferencia entre Simulación Continua y Discreta", a: "Continua: Cambios fluidos apoyados en ecuaciones diferenciales (ej. dinámica de fluidos). Discreta (DES): Cambios ocurren en 'puntos' o eventos cronológicos (ej. colas HTTP, fábricas).", type: "Relación" },
+                { q: "¿Qué es la Simulación Basada en Agentes (ABM)?", a: "Modela individuos autónomos con reglas propias. Enfoque bottom-up para ver fenómenos globales emergentes (ej. propagación de virus, AnyLogic).", type: "Core" },
+                { q: "¿Cuáles son los primeros 3 pasos de las 12 Etapas de la Simulación?", a: "1. Formulación del problema. 2. Definición del sistema (trazar la frontera). 3. Formulación del modelo (Abstracción/Diagramas Causales).", type: "Memorización" }
+            ],
+            quiz: [
+                { q: "En el diseño de experimentos, si busco 'la mejor alternativa' matemática directa, estoy haciendo:", options: ["Estudio de Simulación", "Optimización", "Validación Empírica", "Análisis de Sensibilidad"], correct: 1 },
+                { q: "Según C. West Churchman, ¿qué es el 'Error de medida'?", options: ["Relación matemática mal expresada", "Optimizar el KPI incorrecto", "Variables independientes mal evaluadas", "Simplificación extrema de una caja negra"], correct: 2 },
+                { q: "¿Qué diferencia la Verificación de la Validación?", options: ["Verificar es el diseño, Validar es el código.", "Verificar es código sano (debugging sintáctico), Validar es que represente la realidad empírica.", "Son sinónimos en simulación de sistemas.", "Validar usa matemática analítica, Verificar usa simuladores."], correct: 1 },
+                { q: "Un sistema donde las salidas ajustan la entrada (retroalimentación) se denomina:", options: ["Sistema Estocástico", "Sistema de Lazo Abierto", "Sistema Discreto", "Sistema de Lazo Cerrado"], correct: 3 },
+                { q: "¿Qué tipo de modelo es aquel en el que el estado evoluciona con el tiempo (Ej: Ruteo de paquetes)?", options: ["Estático", "Dinámico", "Lazo Abierto", "Determinístico"], correct: 1 },
+                { q: "¿Cuál es el enfoque que resuelve el modelo matemáticamente para hallar una respuesta exacta?", options: ["Numérico", "Heurístico", "Analítico", "Montecarlo"], correct: 2 },
+                { q: "La etapa de 'Análisis de Sensibilidad' (Etapa 10) en la simulación sirve para:", options: ["Verificar que el código compila sin errores.", "Contrastar el modelo con datos históricos empíricos.", "Ver qué tan frágiles son las conclusiones si se altera un parámetro incierto.", "Crear diagramas causales de Forrester."], correct: 2 },
+                { q: "El 'Síndrome GIGO' (Garbage In, Garbage Out) arruina la toma de decisiones. Saltar qué etapa lo provoca frecuentemente:", options: ["Colección y validación de datos de entrada", "Diseño de experimentos", "Implementación computacional", "Documentación técnica"], correct: 0 }
+            ],
+            dnd: {
+                template: "Un <span class='dropzone' data-answer='Sistema'></span> es un conjunto delimitado de elementos interdependientes. Un <span class='dropzone' data-answer='Modelo'></span> es una construcción intelectual abstracta diseñada para experimentar sin riesgos para el entorno real. En el ciclo de vida, la <span class='dropzone' data-answer='Validación'></span> contrasta el modelo contra la realidad empírica para evitar el síndrome <span class='dropzone' data-answer='GIGO'></span> (Garbage In, Garbage Out). Las variables que ocurren en el Medio Ambiente son las <span class='dropzone' data-answer='Exógenas'></span>. Por otro lado, la <span class='dropzone' data-answer='Verificación'></span> es la tarea de debugging sintáctico.",
+                words: ["GIGO", "Sistema", "Exógenas", "Modelo", "Validación", "Endógenas", "Verificación", "Aproximación"]
+            },
+            match: [
+                { term: "Modelo Estático", def: "Estado invariable. No importa el tiempo cronológico." },
+                { term: "Modelo Estocástico", def: "Interviene el azar y la probabilidad (Ej. latencia de red variable)." },
+                { term: "Modelo Determinístico", def: "Solución única. Cero incertidumbre. Mismos inputs = mismos outputs." },
+                { term: "Sistema en Lazo Abierto", def: "Ejecuta sin importar el resultado. No hay feedback para ajustar el proceso." },
+                { term: "Modelo Físico", def: "Tangible, construido a escala con medidas como voltaje o velocidad." }
+            ]
+        };
+
+        /* =========================================================================
+           1. SISTEMA DE NAVEGACIÓN (TABS) Y EFECTOS
+        ========================================================================= */
+        const navBtns = document.querySelectorAll('.nav-btn');
+        const modules = document.querySelectorAll('.module');
+
+        navBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Quitar activo
+                navBtns.forEach(b => b.classList.remove('active'));
+                modules.forEach(m => m.classList.remove('active'));
+
+                // Poner activo
+                btn.classList.add('active');
+                const target = document.getElementById(btn.dataset.target);
+                target.classList.add('active');
+
+                // Reiniciar animaciones de entrada forzando reflow
+                target.style.animation = 'none';
+                target.offsetHeight; /* trigger reflow */
+                target.style.animation = null;
+            });
+        });
+
+        /* =========================================================================
+           2. POMODORO TIMER (GESTIÓN COGNITIVA)
+        ========================================================================= */
+        let pomoTime = 25 * 60; // 25 mins
+        let pomoInterval = null;
+        let isPomoRunning = false;
+        const timeDisplay = document.getElementById('timeDisplay');
+        const pomoBtn = document.getElementById('pomoBtn');
+        const pomoRing = document.getElementById('pomoRing');
+        const ringCircumference = 16 * 2 * Math.PI; // radio 16
+        pomoRing.style.strokeDasharray = `${ringCircumference} ${ringCircumference}`;
+
+        function updatePomo() {
+            const minutes = Math.floor(pomoTime / 60);
+            const seconds = pomoTime % 60;
+            timeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+            // Actualizar anillo SVG
+            const progress = pomoTime / (25 * 60);
+            const offset = ringCircumference - (progress * ringCircumference);
+            pomoRing.style.strokeDashoffset = offset;
+
+            if (pomoTime <= 0) {
+                clearInterval(pomoInterval);
+                timeDisplay.textContent = "00:00";
+                timeDisplay.style.color = "var(--red-neon)";
+                isPomoRunning = false;
+                pomoBtn.textContent = "↻";
+            } else {
+                pomoTime--;
+            }
+        }
+
+        pomoBtn.addEventListener('click', () => {
+            if (pomoTime <= 0) pomoTime = 25 * 60; // Reset
+
+            if (isPomoRunning) {
+                clearInterval(pomoInterval);
+                pomoBtn.textContent = "▶";
+                isPomoRunning = false;
+            } else {
+                pomoInterval = setInterval(updatePomo, 1000);
+                pomoBtn.textContent = "⏸";
+                isPomoRunning = true;
+            }
+        });
+
+        /* =========================================================================
+           3. GENERADOR DE FLASHCARDS 3D (ACTIVE RECALL)
+        ========================================================================= */
+        const fcContainer = document.getElementById('flashcard-container');
+
+        DATA.flashcards.forEach((card, index) => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'card-container';
+            cardEl.innerHTML = `
+                <div class="flashcard">
+                    <div class="card-face card-front">
+                        <span style="position:absolute; top:10px; right:10px; font-size:0.7rem; color:var(--text-muted); border:1px solid rgba(255,255,255,0.2); padding:2px 5px; border-radius:4px;">${card.type}</span>
+                        <h3>Concepto_0${index + 1}</h3>
+                        <p>${card.q}</p>
+                    </div>
+                    <div class="card-face card-back">
+                        <p>${card.a}</p>
+                        <div class="eval-buttons">
+                            <button class="eval-btn btn-easy" onclick="markCard(event, this)">Fácil</button>
+                            <button class="eval-btn btn-med" onclick="markCard(event, this)">Medio</button>
+                            <button class="eval-btn btn-hard" onclick="markCard(event, this)">Difícil</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            cardEl.addEventListener('click', () => {
+                const fc = cardEl.querySelector('.flashcard');
+                fc.classList.toggle('flipped');
+            });
+
+            fcContainer.appendChild(cardEl);
+        });
+
+        // Evitar que el click en el botón voltee la tarjeta de nuevo
+        window.markCard = function (e, btn) {
+            e.stopPropagation();
+            const card = btn.closest('.flashcard');
+            card.classList.remove('flipped');
+
+            // Feedback visual sutil al contenedor padre
+            const container = card.parentElement;
+            container.style.opacity = '0.5';
+            setTimeout(() => { container.style.opacity = '1'; }, 1000);
+        }
+
+        /* =========================================================================
+           4. QUIZ DE ALTO IMPACTO (GLITCH Y CONFETI)
+        ========================================================================= */
+        let currentQuiz = 0;
+        const qQuestion = document.getElementById('quiz-question');
+        const qOptions = document.getElementById('quiz-options');
+        const qControls = document.getElementById('quiz-controls');
+        const btnNextQuiz = document.getElementById('btn-next-quiz');
+        const quizUI = document.getElementById('quiz-ui');
+
+        function loadQuiz() {
+            const qData = DATA.quiz[currentQuiz];
+            qQuestion.textContent = qData.q;
+            qOptions.innerHTML = '';
+            qControls.style.display = 'none';
+            quizUI.classList.remove('shake-error', 'flash-success');
+
+            qData.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-btn';
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(index, btn);
+                qOptions.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedIndex, btnElement) {
+            const qData = DATA.quiz[currentQuiz];
+            const allBtns = qOptions.querySelectorAll('.quiz-btn');
+
+            // Deshabilitar todos
+            allBtns.forEach(b => b.style.pointerEvents = 'none');
+
+            if (selectedIndex === qData.correct) {
+                // ACELERACIÓN POSITIVA
+                btnElement.classList.add('correct');
+                quizUI.classList.add('flash-success');
+                fireConfetti();
+                qControls.style.display = 'block';
+            } else {
+                // PENALIZACIÓN (SHAKE & GLITCH)
+                btnElement.classList.add('wrong');
+                allBtns[qData.correct].classList.add('correct');
+                quizUI.classList.add('shake-error');
+
+                // Quitar clase shake después de animar para permitir re-trigger
+                setTimeout(() => quizUI.classList.remove('shake-error'), 500);
+                qControls.style.display = 'block';
+            }
+        }
+
+        btnNextQuiz.addEventListener('click', () => {
+            currentQuiz++;
+            if (currentQuiz >= DATA.quiz.length) {
+                qQuestion.innerHTML = "<span style='color:var(--cyan-neon)'>[ Evaluación Completada ]</span><br>Precisión Neural Óptima.";
+                qOptions.innerHTML = '';
+                qControls.style.display = 'none';
+                currentQuiz = 0; // Reset para posible reintento
+            } else {
+                loadQuiz();
+            }
+        });
+
+        loadQuiz(); // Init
+
+        // Sistema de Partículas para Confeti (Éxito)
+        function fireConfetti() {
+            const colors = ['#06b6d4', '#d946ef', '#10b981'];
+            for (let i = 0; i < 30; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = '50%';
+                conf.style.top = '50%';
+                conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                quizUI.appendChild(conf);
+
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 50 + Math.random() * 100;
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity;
+
+                conf.animate([
+                    { transform: 'translate(0,0) scale(1)', opacity: 1 },
+                    { transform: `translate(${tx}px, ${ty}px) scale(0)`, opacity: 0 }
+                ], {
+                    duration: 600 + Math.random() * 400,
+                    easing: 'cubic-bezier(.17,.89,.32,1.49)'
+                }).onfinish = () => conf.remove();
+            }
+        }
+
+        /* =========================================================================
+           5. MÓDULO DRAG & DROP (SNAP MAGNÉTICO)
+        ========================================================================= */
+        const dndText = document.getElementById('dnd-text');
+        const dndBank = document.getElementById('word-bank-container');
+        const dndSuccess = document.getElementById('dnd-success-msg');
+        let correctDrops = 0;
+        let totalDrops = 0;
+
+        // Mezclar array
+        function shuffle(array) {
+            return array.sort(() => Math.random() - 0.5);
+        }
+
+        // Init DND
+        dndText.innerHTML = DATA.dnd.template;
+        const dropzones = document.querySelectorAll('.dropzone');
+        totalDrops = dropzones.length;
+
+        shuffle([...DATA.dnd.words]).forEach(word => {
+            const wEl = document.createElement('div');
+            wEl.className = 'draggable-word';
+            wEl.textContent = word;
+            wEl.draggable = true;
+            wEl.dataset.word = word;
+
+            // Eventos Drag Orig
+            wEl.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', word);
+                setTimeout(() => wEl.style.opacity = '0.5', 0);
+            });
+            wEl.addEventListener('dragend', () => {
+                wEl.style.opacity = '1';
+                dropzones.forEach(dz => dz.classList.remove('drag-over'));
+            });
+
+            dndBank.appendChild(wEl);
+        });
+
+        // Eventos Dropzones
+        dropzones.forEach(dz => {
+            dz.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Permitir drop
+                if (!dz.classList.contains('filled')) {
+                    dz.classList.add('drag-over');
+                }
+            });
+
+            dz.addEventListener('dragleave', () => {
+                dz.classList.remove('drag-over');
+            });
+
+            dz.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dz.classList.remove('drag-over');
+                if (dz.classList.contains('filled')) return;
+
+                const draggedWord = e.dataTransfer.getData('text/plain');
+                const targetWord = dz.dataset.answer;
+
+                if (draggedWord === targetWord) {
+                    // SNAP Correcto
+                    dz.textContent = draggedWord;
+                    dz.classList.add('filled');
+
+                    // Ocultar del banco
+                    const nodeWord = document.querySelector(`.draggable-word[data-word="${draggedWord}"]`);
+                    if (nodeWord) nodeWord.style.display = 'none';
+
+                    // Efecto destello en el dropzone
+                    dz.animate([
+                        { boxShadow: '0 0 0px var(--cyan-neon)' },
+                        { boxShadow: '0 0 20px var(--cyan-neon)' },
+                        { boxShadow: '0 0 0px var(--cyan-neon)' }
+                    ], { duration: 500 });
+
+                    correctDrops++;
+                    if (correctDrops === totalDrops) {
+                        dndSuccess.style.display = 'block';
+                    }
+                } else {
+                    // Fallo: Shake screen effect sutil
+                    document.body.animate([
+                        { transform: 'translateX(-5px)' },
+                        { transform: 'translateX(5px)' },
+                        { transform: 'translateX(0)' }
+                    ], { duration: 300 });
+                }
+            });
+        });
+
+        /* =========================================================================
+           6. NUEVO MÓDULO: CLASIFICADOR NEURAL (MATCHING)
+        ========================================================================= */
+        const matchTermsContainer = document.getElementById('match-terms');
+        const matchDefsContainer = document.getElementById('match-defs');
+        let selectedTerm = null;
+        let selectedDef = null;
+        let matchCount = 0;
+
+        function initMatchModule() {
+            // Arrays separados y mezclados
+            const terms = DATA.match.map((item, index) => ({ text: item.term, id: index }));
+            const defs = DATA.match.map((item, index) => ({ text: item.def, id: index }));
+
+            shuffle(terms).forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'match-item';
+                div.textContent = t.text;
+                div.dataset.id = t.id;
+                div.dataset.type = 'term';
+                div.onclick = () => handleMatchClick(div);
+                matchTermsContainer.appendChild(div);
+            });
+
+            shuffle(defs).forEach(d => {
+                const div = document.createElement('div');
+                div.className = 'match-item';
+                div.textContent = d.text;
+                div.dataset.id = d.id;
+                div.dataset.type = 'def';
+                div.onclick = () => handleMatchClick(div);
+                matchDefsContainer.appendChild(div);
+            });
+        }
+
+        function handleMatchClick(element) {
+            if (element.classList.contains('matched')) return;
+
+            // Deseleccionar si se hace click en el mismo
+            if (element.classList.contains('selected')) {
+                element.classList.remove('selected');
+                if (element.dataset.type === 'term') selectedTerm = null;
+                else selectedDef = null;
+                return;
+            }
+
+            // Seleccionar
+            if (element.dataset.type === 'term') {
+                if (selectedTerm) selectedTerm.classList.remove('selected');
+                selectedTerm = element;
+            } else {
+                if (selectedDef) selectedDef.classList.remove('selected');
+                selectedDef = element;
+            }
+            element.classList.add('selected');
+
+            // Comprobar coincidencia
+            if (selectedTerm && selectedDef) {
+                if (selectedTerm.dataset.id === selectedDef.dataset.id) {
+                    // Éxito: Sincronización
+                    selectedTerm.classList.remove('selected');
+                    selectedDef.classList.remove('selected');
+                    selectedTerm.classList.add('matched');
+                    selectedDef.classList.add('matched');
+
+                    selectedTerm = null;
+                    selectedDef = null;
+                    matchCount++;
+
+                    if (matchCount === DATA.match.length) {
+                        fireConfetti();
+                        setTimeout(() => {
+                            const titulo = document.querySelector('#module-match h2');
+                            titulo.innerHTML = "<span style='color:var(--green-neon)'>[ Taxonomía Asimilada con Éxito ]</span>";
+                        }, 500);
+                    }
+                } else {
+                    // Fallo: Glitch
+                    selectedTerm.classList.add('error');
+                    selectedDef.classList.add('error');
+
+                    setTimeout(() => {
+                        selectedTerm.classList.remove('error', 'selected');
+                        selectedDef.classList.remove('error', 'selected');
+                        selectedTerm = null;
+                        selectedDef = null;
+                    }, 400);
+                }
+            }
+        }
+
+        initMatchModule();
+
+        /* =========================================================================
+           7. FONDO ANIMADO CYBERPUNK (NODOS CONECTADOS)
+        ========================================================================= */
+        const canvas = document.getElementById('neuralCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, particles;
+
+        function initCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            particles = [];
+            const pCount = Math.floor(width / 20); // Densidad adaptable
+
+            for (let i = 0; i < pCount; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * 0.5,
+                    vy: (Math.random() - 0.5) * 0.5
+                });
+            }
+        }
+
+        function drawParticles() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.5)';
+            ctx.lineWidth = 0.5;
+
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+
+                // Rebote bordes
+                if (p.x < 0 || p.x > width) p.vx *= -1;
+                if (p.y < 0 || p.y > height) p.vy *= -1;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Conectar nodos cercanos
+                for (let j = i + 1; j < particles.length; j++) {
+                    let p2 = particles[j];
+                    let dist = Math.hypot(p.x - p2.x, p.y - p2.y);
+
+                    if (dist < 100) {
+                        ctx.strokeStyle = `rgba(6, 182, 212, ${1 - dist / 100})`;
+                        ctx.beginPath();
+                        ctx.moveTo(p.x, p.y);
+                        ctx.lineTo(p2.x, p2.y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(drawParticles);
+        }
+
+        window.addEventListener('resize', initCanvas);
+        initCanvas();
+        drawParticles();
+
+    </script>
+</body>
+
+</html>
